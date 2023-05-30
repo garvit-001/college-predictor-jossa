@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>College List</title>
+    <style>
+        select {
+            display: block;
+            margin: 10px;
+        }
+
+        button {
+            display: flex;
+            margin: 10px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        .pagination {
+            margin-top: 10px;
+        }
+
+        .pagination a {
+            display: inline-block;
+            padding: 5px 10px;
+            margin-right: 5px;
+            border: 1px solid #ccc;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .pagination a.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        var currentPage = 1;
+        var collegesPerPage = 50;
+        var selectedDataFile; // Default data file
+
+        function renderColleges(sortBy) {
+            // Get the selected gender and seat type from the dropdown
+            var selectedGender = document.getElementById("gender").value;
+            var selectedSeatType = document.getElementById("seatType").value;
+
+            // Fetch the CSV file based on the selectedDataFile
+            fetch(selectedDataFile)
+                .then(function (response) {
+                    return response.text();
+                })
+                .then(function (data) {
+                    // Parse the CSV data using PapaParse
+                    var parsedData = Papa.parse(data, { header: true });
+                    var colleges = parsedData.data;
+
+                    // Filter colleges based on the selected gender and seat type
+                    var filteredColleges = colleges.filter(function (college) {
+                        // Check if the required columns have values
+                        return (
+                            college.Gender === selectedGender &&
+                            college['Seat Type'] === selectedSeatType &&
+                            college['Closing Rank'] &&
+                            college['Opening Rank']
+                        );
+                    });
+
+                    // Sort colleges based on the specified column
+                    if (filteredColleges.length > 0) {
+                        filteredColleges.sort(function (a, b) {
+                            return parseInt(a[sortBy]) - parseInt(b[sortBy]);
+                        });
+                    }
+
+                    // Clear previous results
+                    var resultsContainer = document.getElementById("results");
+                    resultsContainer.innerHTML = "";
+
+                    // Create and populate the table
+                    var table = document.createElement("table");
+
+                    // Create the table header
+                    var thead = document.createElement("thead");
+                    var headerRow = document.createElement("tr");
+                    var serialNumberHeader = document.createElement("th");
+                    serialNumberHeader.textContent = "Serial Number";
+                    headerRow.appendChild(serialNumberHeader);
+
+                    // Check if filteredColleges array is not empty
+                    if (filteredColleges.length > 0) {
+                        Object.keys(filteredColleges[0]).forEach(function (key) {
+                            var th = document.createElement("th");
+                            th.textContent = key;
+                            headerRow.appendChild(th);
+                        });
+                    }
+
+                    thead.appendChild(headerRow);
+                    table.appendChild(thead);
+
+                    // Create the table body
+                    var tbody = document.createElement("tbody");
+
+                    // Check if filteredColleges array is not empty
+                    if (filteredColleges.length > 0) {
+                        var startIndex = (currentPage - 1) * collegesPerPage;
+                        var endIndex = startIndex + collegesPerPage;
+                        var collegesToShow = filteredColleges.slice(startIndex, endIndex);
+
+                        collegesToShow.forEach(function (college, index) {
+                            var row = document.createElement("tr");
+                            var serialNumberCell = document.createElement("td");
+                            serialNumberCell.textContent = startIndex + index + 1;
+                            row.appendChild(serialNumberCell);
+                            Object.values(college).forEach(function (value) {
+                                var cell = document.createElement("td");
+                                cell.textContent = value;
+                                row.appendChild(cell);
+                            });
+                            tbody.appendChild(row);
+                        });
+                    }
+
+                    table.appendChild(tbody);
+                    resultsContainer.appendChild(table);
+
+                    // Render pagination
+                    renderPagination(filteredColleges.length);
+                })
+                .catch(function (error) {
+                    console.error('Error fetching CSV data:', error);
+                });
+        }
+
+        function renderPagination(totalColleges) {
+            var totalPages = Math.ceil(totalColleges / collegesPerPage);
+            var paginationContainer = document.getElementById("pagination");
+
+            // Clear previous pagination
+            paginationContainer.innerHTML = "";
+
+            // Create pagination links
+            for (var i = 1; i <= totalPages; i++) {
+                var link = document.createElement("a");
+                link.href = "#";
+                link.textContent = i;
+                link.classList.add("page-link");
+
+                // Set the current page as active
+                if (i === currentPage) {
+                    link.classList.add("active");
+                }
+
+                // Attach event listener to handle page change
+                link.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    currentPage = parseInt(event.target.textContent);
+                    renderColleges();
+                });
+
+                paginationContainer.appendChild(link);
+            }
+        }
+
+        function onRadioChange() {
+            var radioButtons = document.getElementsByName("dataOption");
+            for (var i = 0; i < radioButtons.length; i++) {
+                if (radioButtons[i].checked) {
+                    selectedDataFile = radioButtons[i].value;
+                    break;
+                }
+            }
+        }
+
+        // Initial render
+        onRadioChange();
+        renderColleges();
+
+    </script>
+</head>
+
+<body>
+
+    <label for="gender">Select Gender:</label>
+    <select id="gender">
+        <option value="Gender-Neutral">Gender-Neutral</option>
+        <option value="Female-only (including Supernumerary)">Female-Only</option>
+    </select>
+
+    <label for="seatType">Select Seat Type:</label>
+    <select id="seatType">
+        <option value="OPEN">OPEN</option>
+        <option value="EWS">EWS</option>
+        <option value="OBC-NCL">OBC-NCL</option>
+        <option value="SC">SC</option>
+        <option value="ST">ST</option>
+    </select>
+
+    <label>Select Institute:</label>
+    <input type="radio" name="dataOption" value="2022iit.csv" class="radio" onclick="onRadioChange()">IIT
+    <input type="radio" name="dataOption" value="2021nit.csv" class="radio" onclick="onRadioChange()">NIT
+
+    <button id="closing" onclick="renderColleges('Closing Rank')">Filter & Sort By Closing Rank</button>
+    <button id="opening" onclick="renderColleges('Opening Rank')">Sort by Opening Rank</button>
+
+    <div id="results" style="margin-top: 20px;"></div>
+
+    <div class="pagination" id="pagination"></div>
+</body>
+
+</html>
